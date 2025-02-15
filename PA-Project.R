@@ -1,0 +1,325 @@
+library(caret)
+library(klaR)
+library(C50)
+library(kernlab) 
+library(dplyr)
+library(fastDummies)
+library(neuralnet)
+library(ggplot2)
+getwd()
+
+cs <- read.csv("CaseStudy.csv")
+str(cs)
+head(cs)
+summary(cs)
+View(cs)
+
+##### DATA CLEANING--------------------------------------------------------------------------
+
+csi <- cs[, -c(1, 2, 6)]
+View(csi)
+
+str(csi)
+colSums(is.na(csi))
+length(csi$schoolsel)
+#we get rid of the NA in schoolsel
+
+csi$schoolsel[is.na(csi$schoolsel)] <- 0
+colSums(is.na(csi))
+length(csi$schoolsel)
+
+str(csi)
+
+#transform to factor categorical variables
+csi$stem <- factor(csi$stem)
+str(csi$stem)
+
+csi$schoolsel <- factor(csi$schoolsel) #being the level 0 the values that had NA
+str(csi$schoolsel)
+
+csi$major1<- factor(csi$major1)
+str(csi$major1)
+
+csi$major2<- factor(csi$major2)
+str(csi$major2)
+
+csi$major1group<- factor(csi$major1group)
+str(csi$major1group)
+
+csi$major2group<- factor(csi$major2group)
+str(csi$major2group)
+
+csi$minor<- factor(csi$minor)
+str(csi$minor)
+
+csi$minorgroup<- factor(csi$minorgroup)
+str(csi$minorgroup)
+
+csi$undergrad_uni<- factor(csi$undergrad_uni)
+str(csi$undergrad_uni)
+
+csi$appdeadline<- factor(csi$appdeadline)
+str(csi$appdeadline)
+
+csi$attendedevent<- factor(csi$attendedevent)
+str(csi$attendedevent)
+
+csi$completedadm<- factor(csi$completedadm)
+str(csi$completedadm)
+
+
+
+csi$essay1[csi$essay1length >= 0 & csi$essay1length <= 75] <- 1
+csi$essay1[csi$essay1length > 75 & csi$essay1length <= 150] <- 2
+csi$essay1[csi$essay1length > 150 & csi$essay1length <= 225] <- 3
+csi$essay1[csi$essay1length > 225] <- 4
+# Check the result to confirm the categorization
+table(csi$essay1)
+csi$essay1<- factor(csi$essay1)
+str(csi$essay1)
+
+csi$essay2[csi$essay2length >= 0 & csi$essay2length <= 75] <- 1
+csi$essay2[csi$essay2length > 75 & csi$essay2length <= 150] <- 2
+csi$essay2[csi$essay2length > 150 & csi$essay2length <= 225] <- 3
+csi$essay2[csi$essay2length > 225] <- 4
+# Check the result to confirm the categorization
+table(csi$essay2)
+csi$essay2<- factor(csi$essay2)
+str(csi$essay2)
+
+
+csi$essay3[csi$essay3length >= 0 & csi$essay3length <= 75] <- 1
+csi$essay3[csi$essay3length > 75 & csi$essay3length <= 150] <- 2
+csi$essay3[csi$essay3length > 150 & csi$essay3length <= 225] <- 3
+csi$essay3[csi$essay3length > 225] <- 4
+# Check the result to confirm the categorization
+table(csi$essay3)
+csi$essay3<- factor(csi$essay3)
+str(csi$essay3)
+
+
+
+csi$essayUW[csi$essayuniquewords >= 0 & csi$essayuniquewords <= 100] <- 1
+csi$essayUW[csi$essayuniquewords > 100 & csi$essayuniquewords <= 200] <- 2
+csi$essayUW[csi$essayuniquewords > 200 & csi$essayuniquewords <= 300] <- 3
+csi$essayUW[csi$essayuniquewords > 300 & csi$essayuniquewords <= 400] <- 4
+csi$essayUW[csi$essayuniquewords > 400] <- 5
+# Check the result to confirm the categorization
+table(csi$essayUW)
+csi$essayUW<- factor(csi$essayUW)
+str(csi$essayUW)
+
+
+# Redondear la columna essay_sentiment a un decimal
+#csi$essayssentiment<- round(csi$essayssentiment, 1)
+#head(csi$essayssentiment)
+#csi$essayssentiment<- factor(csi$essayssentiment)
+#str(csi$essayssentiment)
+
+
+csi$essentiment[csi$essayssentiment <= -1] <- 1
+csi$essentiment[csi$essayssentiment > -1 & csi$essayssentiment <= 0 ] <- 2
+csi$essentiment[csi$essayssentiment > 0 & csi$essayssentiment <= 1] <- 3
+csi$essentiment[csi$essayssentiment > 1] <- 4
+table(csi$essentiment )
+csi$essentiment<- factor(csi$essentiment)
+str(csi$essentiment)
+
+
+csi$signup[csi$signupdate  <= 100] <- 1
+csi$signup[csi$signupdate > 100 & csi$signupdate <= 200] <- 2
+csi$signup[csi$signupdate > 200 & csi$signupdate <= 300] <- 3
+csi$signup[csi$signupdate > 300 & csi$signupdate <= 400] <- 4
+csi$signup[csi$signupdate > 400] <- 5
+# Check the result to confirm the categorization
+table(csi$signup)
+csi$signup<- factor(csi$signup)
+str(csi$signup)
+
+
+csi$started[csi$starteddate  <= 100] <- 1
+csi$started[csi$starteddate > 100 & csi$starteddate <= 200] <- 2
+csi$started[csi$starteddate > 200] <- 3
+# Check the result to confirm the categorization
+table(csi$started)
+csi$started<- factor(csi$started)
+str(csi$started)
+
+
+csi$submitted[csi$submitteddate <= 50] <- 1
+csi$submitted[csi$submitteddate > 50 & csi$submitteddate <= 100 ] <- 2
+csi$submitted[csi$submitteddate > 100 & csi$submitteddate <= 150] <- 3
+csi$submitted[csi$submitteddate > 150] <- 4
+# Check the result to confirm the categorization
+table(csi$submitted)
+csi$submitted<- factor(csi$submitted)
+str(csi$submitted)
+
+
+csi$fgpa[csi$gpa <= 1] <- 1
+csi$fgpa[csi$gpa > 1 & csi$gpa <= 2 ] <- 2
+csi$fgpa[csi$gpa > 2 & csi$gpa <= 3] <- 3
+csi$fgpa[csi$gpa > 3] <- 4
+# Check the result to confirm the categorization
+table(csi$fgpa)
+csi$fgpa<- factor(csi$fgpa)
+str(csi$fgpa)
+
+
+str(csi)
+colSums(is.na(csi))
+#eliminate the cols that we dont want// just tranformed into categorical
+csi <- csi[, !(names(csi) %in% c("gpa", "essay1length", "essay2length","essay3length", "essayuniquewords", "essayssentiment", "signupdate", "starteddate", "submitteddate" ))]
+
+str(csi)
+View(csi)
+
+##### NAIVES BAYES--------------------------------------------------------------------------
+
+## create training and holdout sets
+set.seed(1947)  # for reproducibility
+
+# Split
+idx <- createDataPartition(csi$completedadm, p=0.8, list=FALSE)  # From caret pkg, read documentation
+train.df <- csi[idx, ]
+holdout.df <- csi[-idx, ]
+
+# Check label distribution
+proportions(table(csi$completedadm))
+proportions(table(train.df$completedadm))
+proportions(table(holdout.df$completedadm))
+
+### run naive bayes using klaR package
+# Use only origin and destination as predictors
+fd.nb_od <- NaiveBayes(completedadm ~ ., data = train.df)
+# Output model
+fd.nb_od
+# predict probabilities
+fd.pred_od <- predict(fd.nb_od, newdata=holdout.df)
+# Compute Confusion Matrices aka CrossTabs
+confusionMatrix(fd.pred_od$class, factor(holdout.df$completedadm))
+
+### run naive bayes using klaR package
+# Use only origin and destination as predictors
+fd.nb_od <- NaiveBayes(completedadm ~ stem + schoolsel + major1group + major2group + minorgroup + appdeadline + attendedevent + essay1 + essay2 + essay3 + essayUW + essentiment + signup + started + submitted + fgpa, data = train.df)
+# Output model
+fd.nb_od
+# predict probabilities
+fd.pred_od <- predict(fd.nb_od, newdata=holdout.df)
+# Compute Confusion Matrices aka CrossTabs
+confusionMatrix(fd.pred_od$class, factor(holdout.df$completedadm))
+
+### run naive bayes using klaR package
+# Use only origin and destination as predictors
+fd.nb_od <- NaiveBayes(completedadm ~ stem + schoolsel + major1group + major2group + minorgroup + appdeadline + attendedevent + essay1 + essay2 + essay3 + essayUW + essentiment  + submitted + fgpa, data = train.df)
+# Output model
+fd.nb_od
+# predict probabilities
+fd.pred_od <- predict(fd.nb_od, newdata=holdout.df)
+# Compute Confusion Matrices aka CrossTabs
+confusionMatrix(fd.pred_od$class, factor(holdout.df$completedadm))
+
+# Setup traincontrol
+# Cambiado para usar el dataset 'csi' y predecir 'completedadm'
+tc = trainControl(p=0.8, method='cv', verboseIter = TRUE, number=10)
+
+# Train model
+model = train(csi[, colnames(csi)[colnames(csi) != 'completedadm']],
+              csi$completedadm,
+              method='nb', trControl=tc)
+model
+confusionMatrix(predict(model, newdata=holdout.df), factor(holdout.df$completedadm))
+
+## More extensive tuning
+
+# Get tuning parameters
+modelLookup('nb')
+
+# Setup search grid
+nbtune_grid <- expand.grid(usekernel = c(TRUE, FALSE),
+                           fL = c(0, 0.5, 1), 
+                           adjust = c(0.5, 1, 1.5))
+
+# Train model with tuning grid
+model = train(csi[, colnames(csi)[colnames(csi) != 'completedadm']],
+              csi$completedadm,
+              method='nb', trControl=tc,
+              tuneGrid = nbtune_grid)
+model
+confusionMatrix(predict(model, newdata=holdout.df), factor(holdout.df$completedadm))
+
+
+##### DECISION TREE--------------------------------------------------------------------------
+csi2 <- csi[, c("fgpa", "schoolsel", "major1group", "major2group", "appdeadline", "attendedevent", "completedadm", "essayUW", "essentiment", "submitted")]
+View(csi2)
+# class distribution for 'Car_Cancellation'
+table(csi2$completedadm)
+which(colnames(csi2) == "completedadm")  # Check the index position
+# Create a random sample for training and test data (80% training, 20% testing)
+set.seed(1947)  # For reproducibility
+idx_DT <- createDataPartition(csi2$completedadm, p = 0.8, list = FALSE)
+# Split the data into training and testing sets
+train_DT <- csi2[idx_DT, ]
+test_DT <- csi2[-idx_DT, ]
+# Check class distribution in both sets
+proportions(table(train_DT$completedadm))
+proportions(table(test_DT$completedadm))
+
+#TO CHECK WHERE IS THE COL COM CAR CANCELLATION
+target_var_position <- which(colnames(csi2) == "completedadm")
+target_var_position
+
+## **Training a Basic Decision Tree Model**
+# Train a simple decision tree model using C5.0
+csi_model_DT <- C5.0(train_DT[-target_var_position], train_DT$completedadm)
+csi_model_DT
+
+summary(csi_model_DT)
+# Plot the Decision Tree
+plot(csi_model_DT, type = "simple", main = "Decision Tree for completedadm")
+
+## **Evaluating Model Performance**
+# Generate a confusion matrix to evaluate performance
+csi_pred_DT <- predict(csi_model_DT, test_DT)
+
+confusionMatrix(test_DT$completedadm, csi_pred_DT)
+
+## **Improving Model Performance with Boosting**
+# Train a boosted decision tree with 10 trials
+# Boost the accuracy of decision trees
+csi_boost10_DT <- C5.0(train_DT[-target_var_position], train_DT$completedadm, trials = 100)
+
+summary(csi_boost10_DT)
+
+
+csi_boost_pred10_DT <- predict(csi_boost10_DT, test_DT)
+conf_matrix_boosted_DT <- confusionMatrix(test_DT$completedadm, csi_boost_pred10_DT)
+print(conf_matrix_boosted_DT) #IT STAYS THE SAME WITH THE SAME PREDICTIONS AND CONFUSION MATRIX
+
+
+
+## **Applying a Cost Matrix**
+# Define a cost matrix (adjust the values based on the importance of false negatives/positives)
+# Penalize errors for predicting 'no cancellation' when it should be 'cancellation'
+error_cost_DT <- matrix(c(1, 4, 2, 1), nrow = 2,
+                        dimnames = list(c("no", "yes"), c("no", "yes")))
+error_cost_DT
+
+# Ensure that the target variable is properly defined as a factor
+train_DT$completedadm <- factor(train_DT$completedadm, levels = c(0, 1), labels = c("no", "yes"))
+
+test_DT$completedadm <- factor(test_DT$completedadm, levels = c(0, 1), labels = c("no", "yes"))
+
+
+
+# Train a decision tree model with the cost matrix
+csi_model_cost <- C5.0(train_DT[-target_var_position],train_DT$completedadm, costs = error_cost_DT)
+summary(csi_model_cost)
+
+
+# Evaluate the cost-sensitive model on the test set
+csi_pred_cost <- predict(csi_model_cost,test_DT)
+
+# Display the confusion matrix for the cost-sensitive model
+confusionMatrix(test_DT$completedadm, csi_pred_cost)
+plot(csi_model_cost, main = "Decision Tree for CompletedAdm")
